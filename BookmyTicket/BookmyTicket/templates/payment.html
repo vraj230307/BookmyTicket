@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .payment-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 60vh;
+    }
+
+    .payment-card {
+        width: 100%;
+        max-width: 500px;
+        text-align: center;
+    }
+
+    .payment-card h2 {
+        color: #fff;
+        margin-bottom: 20px;
+        font-size: 1.8rem;
+    }
+
+    .amount-display {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--secondary-color);
+        margin-bottom: 30px;
+    }
+
+    .qr-container {
+        background: #fff;
+        padding: 20px;
+        border-radius: 12px;
+        display: inline-block;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+    
+    .qr-container img {
+        max-width: 250px;
+        height: auto;
+        display: block;
+    }
+
+    .booking-summary {
+        background: rgba(15, 23, 42, 0.4);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        text-align: left;
+    }
+
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+    }
+
+    .summary-row:last-child {
+        margin-bottom: 0;
+    }
+
+    .summary-label {
+        color: var(--text-muted);
+    }
+
+    .summary-value {
+        color: #fff;
+        font-weight: 500;
+    }
+
+    .payment-actions {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+    }
+    
+    .btn-large {
+        padding: 12px 30px;
+        font-size: 1.1rem;
+        width: 100%;
+    }
+</style>
+
+<div class="payment-container">
+    <div class="glass-card payment-card">
+        <h2>Scan to Pay</h2>
+        
+        <div class="amount-display">
+            ₹{{ "{:,.2f}".format(total_amount) }}
+        </div>
+        
+        <div class="qr-container">
+            <img src="data:image/png;base64,{{ qr_base64 }}" alt="Payment QR Code">
+        </div>
+
+        <div class="booking-summary">
+            <div class="summary-row">
+                <span class="summary-label">Event:</span>
+                <span class="summary-value">{{ pending.event_name }}</span>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">Seats:</span>
+                <span class="summary-value">{{ pending.num_seats }} ({{ pending.selected_seats }})</span>
+            </div>
+        </div>
+
+        <div class="payment-actions">
+            <!-- Simulated Payment Form -->
+            <form method="POST" style="width: 100%;">
+                <button type="submit" class="btn btn-large">Simulate Payment Success</button>
+            </form>
+        </div>
+        
+        <p style="margin-top: 20px; font-size: 0.85rem; color: var(--text-muted);">
+            Scan using any UPI app like GPay, PhonePe, or Paytm.
+        </p>
+    </div>
+</div>
+{% endblock %}

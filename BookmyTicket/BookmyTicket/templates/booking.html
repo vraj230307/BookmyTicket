@@ -1,0 +1,824 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    .booking-container {
+        display: grid;
+        grid-template-columns: 1fr 350px;
+        gap: 30px;
+        align-items: start;
+    }
+    
+    @media (max-width: 900px) {
+        .booking-container {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .seat-map-card {
+        padding: 40px;
+        text-align: center;
+        min-height: 400px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* === MOVIE LAYOUT STYLES === */
+    .screen {
+        width: 100%;
+        max-width: 400px;
+        height: 40px;
+        background: linear-gradient(to bottom, rgba(255, 255, 255, 0.2), transparent);
+        border-top: 2px solid var(--primary-color);
+        border-radius: 50% 50% 0 0 / 20px 20px 0 0;
+        margin-bottom: 40px;
+        position: relative;
+    }
+    .screen::after {
+        content: 'SCREEN';
+        position: absolute;
+        top: -25px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        letter-spacing: 2px;
+    }
+
+    .seats-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+
+    .seat-row {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+    .seat-row::before {
+        content: attr(data-row);
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        margin-right: 15px;
+        font-weight: 600;
+        width: 20px;
+    }
+
+    .seat {
+        width: 35px;
+        height: 35px;
+        background-color: var(--surface-color);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px 8px 4px 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        position: relative;
+    }
+    .seat:hover:not(.occupied) {
+        border-color: var(--primary-color);
+        transform: translateY(-2px);
+    }
+    .seat.selected {
+        background-color: var(--primary-color);
+        border-color: var(--primary-hover);
+        color: #fff !important;
+    }
+    .seat.occupied {
+        background-color: #334155;
+        border-color: rgba(255, 255, 255, 0.05);
+        color: rgba(255,255,255,0.2) !important;
+        cursor: not-allowed;
+    }
+
+    .seat-legend {
+        display: flex;
+        gap: 20px;
+        margin-top: 30px;
+        justify-content: center;
+        width: 100%;
+        flex-wrap: wrap;
+    }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+    .legend-box { width: 20px; height: 20px; border-radius: 4px; }
+    
+    .stand-seats-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* === SPORTS LAYOUT STYLES === */
+    .stadium-container {
+        position: relative;
+        width: 400px;
+        height: 400px;
+        margin: 0 auto;
+    }
+    
+    .pitch {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 150px;
+        height: 200px;
+        background: #10b981;
+        border-radius: 50%;
+        border: 3px solid rgba(255,255,255,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+    }
+    
+    .pitch::after {
+        content: 'PITCH';
+        color: rgba(255,255,255,0.8);
+        font-weight: 700;
+        letter-spacing: 2px;
+    }
+
+    .stand {
+        position: absolute;
+        background: var(--surface-color);
+        border: 2px solid var(--glass-border);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        color: var(--text-color);
+        z-index: 5;
+    }
+
+    .stand:hover {
+        background: rgba(99, 102, 241, 0.2);
+        border-color: var(--primary-color);
+    }
+    
+    .stand.selected {
+        background: var(--primary-color);
+        border-color: #fff;
+        color: #fff;
+        transform: scale(1.05);
+        z-index: 20;
+    }
+    
+    .stand-price {
+        font-size: 0.8rem;
+        color: var(--secondary-color);
+        font-weight: 600;
+    }
+    .stand.selected .stand-price {
+        color: #fff;
+    }
+
+    /* Positioning Sports Stands */
+    .stand-north { top: 0; left: 50%; transform: translateX(-50%); width: 150px; height: 60px; border-radius: 20px 20px 0 0; }
+    .stand-south { bottom: 0; left: 50%; transform: translateX(-50%); width: 150px; height: 60px; border-radius: 0 0 20px 20px; }
+    .stand-east { top: 50%; right: 20px; transform: translateY(-50%); width: 60px; height: 200px; border-radius: 0 20px 20px 0; }
+    .stand-west { top: 50%; left: 20px; transform: translateY(-50%); width: 60px; height: 200px; border-radius: 20px 0 0 20px; }
+    
+    .stand-pavilion { top: 30px; right: 80px; width: 80px; height: 80px; border-radius: 50%; border-color: gold; }
+
+
+    /* === CONCERT LAYOUT STYLES === */
+    .concert-arena {
+        position: relative;
+        width: 100%;
+        max-width: 450px;
+        height: 500px;
+        margin: 0 auto;
+        background: rgba(0,0,0,0.1);
+        border-radius: 20px;
+        border: 1px solid var(--glass-border);
+    }
+    
+    .concert-stage-area {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        height: 60px;
+        background: linear-gradient(135deg, #10b981, #059669);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        letter-spacing: 3px;
+        color: #fff;
+        box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+    }
+    
+    .concert-zone {
+        position: absolute;
+        background: var(--surface-color);
+        border: 2px solid var(--glass-border);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-align: center;
+        color: var(--text-color);
+    }
+
+    .concert-zone:hover {
+        background: rgba(99, 102, 241, 0.2);
+        border-color: var(--primary-color);
+    }
+    
+    .concert-zone.selected {
+        background: var(--primary-color);
+        border-color: #fff;
+        z-index: 10;
+        box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+    }
+    
+    .concert-zone.premium {
+        border-color: gold;
+    }
+    
+    .zone-name { font-weight: 700; font-size: 0.9rem; }
+    .zone-price { font-size: 0.8rem; color: var(--secondary-color); font-weight: 600; margin-top: 5px; }
+    .concert-zone.selected .zone-name, .concert-zone.selected .zone-price { color: #fff; }
+
+    /* Concert Zone Positioning */
+    .zone-fan-pit {
+        top: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 50%;
+        height: 70px;
+        border-radius: 40px 40px 10px 10px;
+    }
+    .zone-fan-pit:hover { transform: translateX(-50%) translateY(-2px); }
+    .zone-fan-pit.selected { transform: translateX(-50%) scale(1.02); }
+    
+    .zone-golden-circle {
+        top: 190px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 65%;
+        height: 90px;
+        border-radius: 20px;
+    }
+    .zone-golden-circle:hover { transform: translateX(-50%) translateY(-2px); }
+    .zone-golden-circle.selected { transform: translateX(-50%) scale(1.02); }
+    
+    .zone-ga {
+        top: 300px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 85%;
+        height: 130px;
+        border-radius: 20px;
+    }
+    .zone-ga:hover { transform: translateX(-50%) translateY(-2px); }
+    .zone-ga.selected { transform: translateX(-50%) scale(1.02); }
+    
+    .zone-vip-left {
+        top: 120px;
+        left: 10px;
+        width: 15%;
+        height: 140px;
+        border-radius: 15px;
+    }
+    .zone-vip-left:hover { transform: translateY(-2px); }
+    .zone-vip-left.selected { transform: scale(1.02); }
+    
+    .zone-vip-right {
+        top: 120px;
+        right: 10px;
+        width: 15%;
+        height: 140px;
+        border-radius: 15px;
+    }
+    .zone-vip-right:hover { transform: translateY(-2px); }
+    .zone-vip-right.selected { transform: scale(1.02); }
+
+
+    /* === SHARED UI === */
+    .quantity-selector {
+        margin-top: 20px;
+        display: none; /* Hidden until an area is selected */
+        background: rgba(15, 23, 42, 0.6);
+        padding: 15px;
+        border-radius: 10px;
+        width: 100%;
+        border: 1px solid var(--glass-border);
+    }
+
+    .quantity-controls {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        margin-top: 10px;
+    }
+
+    .qty-btn {
+        background: var(--surface-color);
+        border: 1px solid var(--glass-border);
+        color: #fff;
+        width: 35px;
+        height: 35px;
+        border-radius: 5px;
+        font-size: 1.2rem;
+        cursor: pointer;
+    }
+    .qty-btn:hover { background: var(--primary-color); }
+    
+    #qty-input {
+        width: 50px;
+        text-align: center;
+        background: transparent;
+        border: none;
+        color: #fff;
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
+
+
+    /* SUMMARY PANEL */
+    .booking-summary {
+        position: sticky;
+        top: 100px;
+    }
+    .summary-header {
+        border-bottom: 1px solid var(--glass-border);
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+    }
+    .summary-header h3 { color: #fff; margin-bottom: 5px; }
+    .summary-header p { color: var(--text-muted); font-size: 0.9rem; }
+    
+    .selection-display {
+        min-height: 50px;
+        margin-bottom: 20px;
+        color: var(--primary-color);
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+    
+    .price-calc {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        color: var(--text-muted);
+    }
+    
+    .total-price {
+        display: flex;
+        justify-content: space-between;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #fff;
+        border-top: 1px dashed var(--glass-border);
+        padding-top: 15px;
+        margin-top: 15px;
+        margin-bottom: 30px;
+    }
+</style>
+
+<div class="booking-container">
+    <div class="glass-card seat-map-card" id="map-container">
+        <!-- Rendered via JS based on event type -->
+    </div>
+
+    <div class="glass-card booking-summary">
+        <div class="summary-header">
+            <h3>{{ event.name }}</h3>
+            <p>{{ event.date }} • {{ event.type }}</p>
+        </div>
+        
+        <p style="color: var(--text-muted); margin-bottom: 10px; font-size: 0.9rem;" id="selection-label">Selected:</p>
+        <div class="selection-display" id="selection-display">None</div>
+        
+        <!-- Quantity Selector (Only visible for non-movies) -->
+        <div class="quantity-selector" id="quantity-panel">
+            <p style="text-align: center; color: var(--text-muted); font-size: 0.9rem;">Number of Tickets (Max 8)</p>
+            <div class="quantity-controls">
+                <button type="button" class="qty-btn" onclick="changeQty(-1)">-</button>
+                <input type="text" id="qty-input" value="1" readonly>
+                <button type="button" class="qty-btn" onclick="changeQty(1)">+</button>
+            </div>
+        </div>
+
+        <div class="price-calc" style="margin-top: 20px;">
+            <span>Tickets (<span id="ticket-count">0</span>):</span>
+            <span>₹<span id="subtotal">0</span></span>
+        </div>
+        <div class="price-calc">
+            <span>Convenience Fee:</span>
+            <span>₹<span id="fee">0</span></span>
+        </div>
+        
+        <div class="total-price">
+            <span>Total:</span>
+            <span>₹<span id="total-price">0</span></span>
+        </div>
+        
+        <form method="POST" id="booking-form">
+            <input type="hidden" name="start_time" value="{{ start_time }}">
+            <input type="hidden" name="num_seats" id="num_seats_input" value="0">
+            <input type="hidden" name="selected_seats" id="selected_seats_input" value="">
+            <input type="hidden" name="total_price" id="total_price_input" value="0">
+            <button type="submit" class="btn" style="width: 100%; padding: 15px; font-size: 1.1rem;" id="checkout-btn" disabled>Confirm Booking</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const eventType = "{{ event.type }}"; // Movie, Sports, Concert
+    const mapContainer = document.getElementById('map-container');
+    const maxSeats = 8;
+    
+    // Global State
+    let selectedIndividualSeats = []; // For Movies [ {id, price} ]
+    let selectedArea = null; // For Sports/Concerts {name, price}
+    let selectedQuantity = 1;
+    
+    // Seed for random occupancy
+    const seed = "{{ event.name }}".length;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (eventType === 'Movie') {
+            renderMovieLayout();
+        } else if (eventType === 'Sports') {
+            renderSportsLayout();
+        } else if (eventType === 'Concert') {
+            renderConcertLayout();
+        }
+        updateSummary();
+    });
+
+    // ==============================================
+    // 1. MOVIE RENDERING (Individual Seat Selection)
+    // ==============================================
+    function renderMovieLayout() {
+        document.getElementById('selection-label').textContent = "Selected Seats (Max 8):";
+        
+        const screen = document.createElement('div');
+        screen.className = 'screen';
+        mapContainer.appendChild(screen);
+        
+        const grid = document.createElement('div');
+        grid.className = 'seats-grid';
+        
+        const seatConfig = [
+            { id: 'A', price: 150, category: 'Front (A-B)' },
+            { id: 'B', price: 150, category: 'Front (A-B)' },
+            { id: 'C', price: 250, category: 'Middle (C-D)' },
+            { id: 'D', price: 250, category: 'Middle (C-D)' },
+            { id: 'E', price: 400, category: 'Recliner (E-F)' },
+            { id: 'F', price: 400, category: 'Recliner (E-F)' }
+        ];
+        
+        const cols = 10;
+        
+        seatConfig.forEach((row, rIndex) => {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'seat-row';
+            rowDiv.setAttribute('data-row', row.id);
+            rowDiv.title = `${row.category} - ₹${row.price}`;
+            
+            for(let c = 1; c <= cols; c++) {
+                if (c === 6) {
+                    const aisle = document.createElement('div');
+                    aisle.style.width = '20px';
+                    rowDiv.appendChild(aisle);
+                }
+
+                const seatId = `${row.id}${c}`;
+                const seat = document.createElement('div');
+                seat.className = 'seat';
+                seat.textContent = c;
+                seat.title = `Row ${row.id} - ₹${row.price}`;
+                
+                const isOccupied = (rIndex * cols + c + seed) % 7 === 0;
+                
+                if(isOccupied) {
+                    seat.classList.add('occupied');
+                } else {
+                    seat.addEventListener('click', () => {
+                        if(seat.classList.contains('selected')) {
+                            seat.classList.remove('selected');
+                            selectedIndividualSeats = selectedIndividualSeats.filter(s => s.id !== seatId);
+                        } else {
+                            if(selectedIndividualSeats.length >= maxSeats) {
+                                alert(`You can only select up to ${maxSeats} seats.`);
+                                return;
+                            }
+                            seat.classList.add('selected');
+                            selectedIndividualSeats.push({id: seatId, price: row.price});
+                        }
+                        updateSummary();
+                    });
+                }
+                rowDiv.appendChild(seat);
+            }
+            grid.appendChild(rowDiv);
+        });
+        
+        mapContainer.appendChild(grid);
+        
+        // Legend
+        const legend = document.createElement('div');
+        legend.className = 'seat-legend';
+        legend.innerHTML = `
+            <div class="legend-item"><div class="legend-box" style="background: var(--surface-color); border: 1px solid var(--glass-border);"></div> Available</div>
+            <div class="legend-item"><div class="legend-box" style="background: var(--primary-color);"></div> Selected</div>
+            <div class="legend-item"><div class="legend-box" style="background: #334155;"></div> Occupied</div>
+        `;
+        mapContainer.appendChild(legend);
+    }
+
+    // ==============================================
+    // 2. SPORTS RENDERING (Stadium Areas)
+    // ==============================================
+    function renderSportsLayout() {
+        document.getElementById('selection-label').textContent = "Select a Section & Seats:";
+        
+        const container = document.createElement('div');
+        container.className = 'stadium-container';
+        
+        const stands = [
+            { id: 'north', name: 'North Stand', price: 500, class: 'stand-north' },
+            { id: 'south', name: 'South Stand', price: 500, class: 'stand-south' },
+            { id: 'east', name: 'East Stand', price: 800, class: 'stand-east' },
+            { id: 'west', name: 'West Stand', price: 800, class: 'stand-west' },
+            { id: 'pavilion', name: 'Pavilion', price: 2500, class: 'stand-pavilion' }
+        ];
+        
+        const pitch = document.createElement('div');
+        pitch.className = 'pitch';
+        container.appendChild(pitch);
+        
+        stands.forEach(standData => {
+            const stand = document.createElement('div');
+            stand.className = `stand ${standData.class}`;
+            // If it's east or west, we might want text running vertically or just relying on hover, but we'll try to fit it.
+            stand.innerHTML = `
+                <div style="font-weight: 700; text-align:center; font-size: 0.8rem;">${standData.name}</div>
+                <div class="stand-price">₹${standData.price}</div>
+            `;
+            
+            stand.addEventListener('click', () => {
+                document.querySelectorAll('.stand').forEach(s => s.classList.remove('selected'));
+                stand.classList.add('selected');
+                
+                // INSTEAD of quantity panel, we show specific seats
+                renderSportsSeats(standData, container);
+            });
+            
+            container.appendChild(stand);
+        });
+        
+        mapContainer.appendChild(container);
+    }
+    
+    function renderSportsSeats(standData, stadiumContainer) {
+        // Hide stadium
+        stadiumContainer.style.display = 'none';
+        
+        // Reset previously selected seats
+        selectedIndividualSeats = [];
+        selectedArea = { name: standData.name, price: standData.price };
+        updateSummary();
+        
+        // Check if wrapper already exists
+        let wrapper = document.getElementById('sports-seats-wrapper');
+        if (wrapper) {
+            wrapper.remove();
+        }
+        
+        wrapper = document.createElement('div');
+        wrapper.id = 'sports-seats-wrapper';
+        wrapper.className = 'stand-seats-wrapper';
+        
+        const backBtn = document.createElement('button');
+        backBtn.className = 'btn';
+        backBtn.textContent = '⬅ Back to Stadium Map';
+        backBtn.style.marginBottom = '20px';
+        backBtn.style.padding = '8px 15px';
+        backBtn.style.fontSize = '0.9rem';
+        backBtn.onclick = () => {
+            wrapper.style.display = 'none';
+            stadiumContainer.style.display = 'block';
+            selectedIndividualSeats = [];
+            selectedArea = null;
+            document.querySelectorAll('.stand').forEach(s => s.classList.remove('selected'));
+            document.getElementById('selection-label').textContent = "Select a Section & Seats:";
+            updateSummary();
+        };
+        wrapper.appendChild(backBtn);
+        
+        const title = document.createElement('h3');
+        title.textContent = `${standData.name} - Select Your Seats`;
+        title.style.marginBottom = '30px';
+        wrapper.appendChild(title);
+
+        const grid = document.createElement('div');
+        grid.className = 'seats-grid';
+        
+        const rows = ['A','B','C','D','E'];
+        const cols = 10;
+        
+        rows.forEach((rowId, rIndex) => {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'seat-row';
+            rowDiv.setAttribute('data-row', rowId);
+            rowDiv.title = `${standData.name} - ₹${standData.price}`;
+            
+            for(let c = 1; c <= cols; c++) {
+                if (c === 6) {
+                    const aisle = document.createElement('div');
+                    aisle.style.width = '20px';
+                    rowDiv.appendChild(aisle);
+                }
+
+                const seatId = `${rowId}${c}`;
+                const seat = document.createElement('div');
+                seat.className = 'seat';
+                seat.textContent = c;
+                seat.title = `Row ${rowId} - ₹${standData.price}`;
+                
+                // Make occupation deterministic but spread out
+                const isOccupied = ((rIndex * cols) + c + seed + standData.name.length) % 5 === 0;
+                
+                if(isOccupied) {
+                    seat.classList.add('occupied');
+                } else {
+                    seat.addEventListener('click', () => {
+                        if(seat.classList.contains('selected')) {
+                            seat.classList.remove('selected');
+                            selectedIndividualSeats = selectedIndividualSeats.filter(s => s.id !== seatId);
+                        } else {
+                            if(selectedIndividualSeats.length >= maxSeats) {
+                                alert(`You can only select up to ${maxSeats} seats.`);
+                                return;
+                            }
+                            seat.classList.add('selected');
+                            selectedIndividualSeats.push({id: seatId, price: standData.price});
+                        }
+                        updateSummary();
+                    });
+                }
+                rowDiv.appendChild(seat);
+            }
+            grid.appendChild(rowDiv);
+        });
+        
+        wrapper.appendChild(grid);
+        
+        // Add Legend
+        const legend = document.createElement('div');
+        legend.className = 'seat-legend';
+        legend.innerHTML = `
+            <div class="legend-item"><div class="legend-box" style="background: var(--surface-color); border: 1px solid var(--glass-border);"></div> Available</div>
+            <div class="legend-item"><div class="legend-box" style="background: var(--primary-color);"></div> Selected</div>
+            <div class="legend-item"><div class="legend-box" style="background: #334155;"></div> Occupied</div>
+        `;
+        wrapper.appendChild(legend);
+
+        mapContainer.appendChild(wrapper);
+        document.getElementById('selection-label').textContent = "Selected Seats (Max 8):";
+    }
+
+    // ==============================================
+    // 3. CONCERT RENDERING (Stage Zones)
+    // ==============================================
+    function renderConcertLayout() {
+        document.getElementById('selection-label').textContent = "Selected Ticket Option:";
+        
+        const container = document.createElement('div');
+        container.className = 'concert-arena';
+        
+        const stage = document.createElement('div');
+        stage.className = 'concert-stage-area';
+        stage.textContent = "MAIN STAGE";
+        container.appendChild(stage);
+        
+        const zones = [
+            { id: 'fan-pit', name: 'Fan Pit', price: 3500, class: 'zone-fan-pit', premium: false },
+            { id: 'golden-circle', name: 'Golden Circle', price: 2000, class: 'zone-golden-circle', premium: false },
+            { id: 'ga', name: 'General Admission', price: 1000, class: 'zone-ga', premium: false },
+            { id: 'vip-left', name: 'VIP Lounge', price: 8500, class: 'zone-vip-left', premium: true },
+            { id: 'vip-right', name: 'VIP Lounge', price: 8500, class: 'zone-vip-right', premium: true }
+        ];
+        
+        zones.forEach(zoneData => {
+            const zone = document.createElement('div');
+            zone.className = `concert-zone ${zoneData.class} ${zoneData.premium ? 'premium' : ''}`;
+            
+            zone.innerHTML = `
+                <div class="zone-name">${zoneData.name}</div>
+                <div class="zone-price">₹${zoneData.price}</div>
+            `;
+            
+            zone.addEventListener('click', () => {
+                document.querySelectorAll('.concert-zone').forEach(z => z.classList.remove('selected'));
+                // Select all elements with the same name (so both VIP lounges select together)
+                document.querySelectorAll('.concert-zone').forEach(z => {
+                    if (z.querySelector('.zone-name').textContent === zoneData.name) {
+                        z.classList.add('selected');
+                    }
+                });
+                
+                selectedArea = { name: zoneData.name, price: zoneData.price };
+                
+                // Show quantity panel
+                document.getElementById('quantity-panel').style.display = 'block';
+                
+                updateSummary();
+            });
+            
+            container.appendChild(zone);
+        });
+        
+        mapContainer.appendChild(container);
+    }
+
+    // ==============================================
+    // SHARED LOGIC
+    // ==============================================
+    window.changeQty = function(delta) {
+        let newQty = selectedQuantity + delta;
+        if (newQty >= 1 && newQty <= maxSeats) {
+            selectedQuantity = newQty;
+            document.getElementById('qty-input').value = selectedQuantity;
+            updateSummary();
+        }
+    };
+
+    function updateSummary() {
+        let count = 0;
+        let subtotal = 0;
+        let displayStr = 'None';
+        let dbSeatsStr = '';
+        
+        if (eventType === 'Movie' || eventType === 'Sports') {
+            count = selectedIndividualSeats.length;
+            if(count > 0) {
+                let seatsArr = selectedIndividualSeats.map(s => s.id);
+                displayStr = seatsArr.join(', ');
+                if (eventType === 'Sports' && selectedArea) {
+                    displayStr = `${selectedArea.name}: ` + displayStr;
+                }
+                dbSeatsStr = displayStr; // E.g., "A1, A2" or "North Stand: A1, A2"
+                subtotal = selectedIndividualSeats.reduce((sum, seat) => sum + seat.price, 0);
+            }
+        } else {
+            // Concert (Area based logic)
+            if (selectedArea) {
+                count = selectedQuantity;
+                displayStr = `${selectedArea.name} (x${count})`;
+                dbSeatsStr = displayStr; // E.g., "Fan Pit (x4)"
+                subtotal = selectedArea.price * count;
+            }
+        }
+        
+        // Update UI
+        document.getElementById('selection-display').textContent = displayStr;
+        document.getElementById('ticket-count').textContent = count;
+        
+        const fee = count > 0 ? 50 : 0; // Fixed convenience fee per transaction
+        const total = subtotal + fee;
+        
+        document.getElementById('subtotal').textContent = subtotal;
+        document.getElementById('fee').textContent = fee;
+        document.getElementById('total-price').textContent = total;
+        
+        // Update hidden inputs for backend submission
+        document.getElementById('num_seats_input').value = count;
+        document.getElementById('selected_seats_input').value = dbSeatsStr;
+        document.getElementById('total_price_input').value = total;
+        
+        // Enable/disable submit button
+        document.getElementById('checkout-btn').disabled = count === 0;
+    }
+</script>
+{% endblock %}
